@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -9,27 +10,29 @@ import (
 	"syscall"
 )
 
-func main() {
-	var err error
+type options struct {
+	conn   int
+	output string
+}
 
-	conn    := flag.Int("n", runtime.NumCPU(), "connection")
-	skiptls := flag.Bool("skip-tls", true, "skip verify certificate for https")
+func main() {
+	var ops options
+	flag.IntVar(&ops.conn, "n", runtime.NumCPU(), "concurrent connection")
+	flag.StringVar(&ops.output, "o", "", "output path")
 
 	flag.Parse()
+
 	args := flag.Args()
 	if len(args) < 1 {
-		Errorln("url is required")
 		usage()
 		os.Exit(1)
 	}
 
-	command := args[0]
-	if command == "tasks" {
-		if err = TaskPrint(); err != nil {
-			Errorf("%v\n", err)
-		}
+	switch args[0] {
+	case "tasks":
+		FatalCheck(TaskPrint())
 		return
-	} else if command == "resume" {
+	case "resume":
 		if len(args) < 2 {
 			Errorln("downloading task name is required")
 			usage()
@@ -37,84 +40,86 @@ func main() {
 		}
 		state, err := Resume(args[1])
 		FatalCheck(err)
-		Execute(state.Url, state, *conn, *skiptls)
+		FatalCheck(execute(state.Url, state, ops))
 		return
-	} else {
-		if ExistDir(FolderOf(command)) {
-			Warnf("Downloading task already exist, remove first \n")
-			err := os.RemoveAll(FolderOf(command))
-			FatalCheck(err)
-		}
-		Execute(command, nil, *conn, *skiptls)
 	}
+
+	//otherwise is hget <URL> command
+	if ExistDir(FolderOf(args[0])) {
+		Warnf("Downloading task already exist, remove first \n")
+		FatalCheck(os.RemoveAll(FolderOf(args[0])))
+	}
+	FatalCheck(execute(args[0], nil, ops))
 }
 
-func Execute(url string, state *State, conn int, skiptls bool) {
-	//otherwise is hget <URL> command
-	var err error
-
-	signal_chan := make(chan os.Signal, 1)
-	signal.Notify(signal_chan,
+func execute(url string, state *State, ops options) error {
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan,
 		syscall.SIGHUP,
 		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
+		syscall.SIGTERM)
 
-	//set up parallel
+	var (
+		isInterrupted = false
+		doneChan      = make(chan struct{})
+		errorChan     = make(chan error)
+		interruptChan = make(chan struct{})
+		downloader    *HttpDownloader
+		err           error
+	)
 
-	var files = make([]string, 0)
-	var parts = make([]Part, 0)
-	var isInterrupted = false
-
-	doneChan := make(chan bool, conn)
-	fileChan := make(chan string, conn)
-	errorChan := make(chan error, 1)
-	stateChan := make(chan Part, 1)
-	interruptChan := make(chan bool, conn)
-
-	var downloader *HttpDownloader
-	if state == nil {
-		downloader = NewHttpDownloader(url, conn, skiptls)
+	if state != nil {
+		downloader, err = RestoreHttpDownloader(state)
 	} else {
-		downloader = &HttpDownloader{url: state.Url, file: filepath.Base(state.Url), par: int64(len(state.Parts)), parts: state.Parts, resumable: true}
+		downloader, err = NewHttpDownloader(url, ops.conn)
 	}
-	go downloader.Do(doneChan, fileChan, errorChan, interruptChan, stateChan)
+	if err != nil {
+		return err
+	}
+
+	go downloader.Do(doneChan, errorChan, interruptChan)
 
 	for {
 		select {
-		case <-signal_chan:
-			//send par number of interrupt for each routine
-			isInterrupted = true
-			for i := 0; i < conn; i++ {
-				interruptChan <- true
+		case <-signalChan:
+			if !isInterrupted {
+				isInterrupted = true
+				close(interruptChan)
 			}
-		case file := <-fileChan:
-			files = append(files, file)
 		case err := <-errorChan:
 			Errorf("%v", err)
-			panic(err) //maybe need better style
-		case part := <-stateChan:
-			parts = append(parts, part)
+			isInterrupted = true
 		case <-doneChan:
+			s := downloader.Capture()
 			if isInterrupted {
 				if downloader.resumable {
 					Printf("Interrupted, saving state ... \n")
-					s := &State{Url: url, Parts: parts}
-					err := s.Save()
-					if err != nil {
-						Errorf("%v\n", err)
-					}
-					return
+					return s.Save()
 				} else {
 					Warnf("Interrupted, but downloading url is not resumable, silently die")
-					return
+					return nil
 				}
 			} else {
-				err = JoinFile(files, filepath.Base(url))
-				FatalCheck(err)
-				err = os.RemoveAll(FolderOf(url))
-				FatalCheck(err)
-				return
+				parts := s.Parts
+				files := make([]string, 0, len(parts))
+				for i := range parts {
+					// fmt.Printf("get a part: %#v\n", parts[i])
+					files = append(files, parts[i].Path)
+				}
+				err := s.Save()
+				if err != nil {
+					return err
+				}
+				if ops.output == "" {
+					ops.output = filepath.Join(".", s.Name)
+				}
+				err = JoinFile(files, ops.output)
+				if err != nil {
+					return err
+				}
+				dir := filepath.Dir(files[0])
+				Printf("Deleting temp files in %s\n", dir)
+				return os.RemoveAll(dir)
 			}
 		}
 	}
@@ -122,8 +127,8 @@ func Execute(url string, state *State, conn int, skiptls bool) {
 
 func usage() {
 	Printf(`Usage:
-hget [URL] [-n connection] [-skip-tls true]
+hget [-n connection] -o path [URL]
 hget tasks
-hget resume [TaskName]
+hget resume -o path [TaskName]
 `)
 }

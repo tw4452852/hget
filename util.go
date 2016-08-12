@@ -1,8 +1,12 @@
 package main
 
 import (
-	"net"
+	"fmt"
+	"io/ioutil"
 	"os"
+	"os/user"
+	"path/filepath"
+	"strings"
 )
 
 func FatalCheck(err error) {
@@ -12,18 +16,8 @@ func FatalCheck(err error) {
 	}
 }
 
-func FilterIPV4(ips []net.IP) []string {
-	var ret = make([]string, 0)
-	for _, ip := range ips {
-		if ip.To4() != nil {
-			ret = append(ret, ip.String())
-		}
-	}
-	return ret
-}
-
 func MkdirIfNotExist(folder string) error {
-	if _, err := os.Stat(folder); err != nil {
+	if _, err := os.Lstat(folder); err != nil {
 		if err = os.MkdirAll(folder, 0700); err != nil {
 			return err
 		}
@@ -32,6 +26,43 @@ func MkdirIfNotExist(folder string) error {
 }
 
 func ExistDir(folder string) bool {
-	_, err := os.Stat(folder)
+	_, err := os.Lstat(folder)
 	return err == nil
+}
+
+const (
+	dataFolder    = ".hget/"
+	stateFileName = "state.json"
+)
+
+var homeDir string
+
+func init() {
+	user, err := user.Current()
+	FatalCheck(err)
+	homeDir = user.HomeDir
+}
+
+func FolderOf(filename string) string {
+	return filepath.Join(homeDir, dataFolder, filename)
+}
+
+func TaskPrint() error {
+	downloading, err := ioutil.ReadDir(filepath.Join(homeDir, dataFolder))
+	if err != nil {
+		return err
+	}
+
+	folders := make([]string, 0)
+	for _, d := range downloading {
+		if d.IsDir() {
+			folders = append(folders, d.Name())
+		}
+	}
+
+	folderString := strings.Join(folders, "\n")
+	Printf("Currently on going download: \n")
+	fmt.Println(folderString)
+
+	return nil
 }

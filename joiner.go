@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/cheggaaa/pb"
-	"github.com/fatih/color"
 	"io"
 	"os"
 	"sort"
+
+	"github.com/cheggaaa/pb"
+	"github.com/fatih/color"
 )
 
 func JoinFile(files []string, out string) error {
