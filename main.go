@@ -44,11 +44,6 @@ func main() {
 		return
 	}
 
-	//otherwise is hget <URL> command
-	if ExistDir(FolderOf(args[0])) {
-		Warnf("Downloading task already exist, remove first \n")
-		FatalCheck(os.RemoveAll(FolderOf(args[0])))
-	}
 	FatalCheck(execute(args[0], nil, ops))
 }
 

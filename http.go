@@ -85,6 +85,14 @@ func NewHttpDownloader(url string, par int) (*HttpDownloader, error) {
 	fileName := getFileName(resp.Header.Get(contentDispositionHeader), url)
 	fmt.Printf("filename: %q\n", fileName)
 	folder := FolderOf(fileName)
+	if ExistDir(folder) {
+		state, err := Resume(fileName)
+		if err != nil {
+			return nil, err
+		}
+		return RestoreHttpDownloader(state)
+	}
+
 	if err := MkdirIfNotExist(folder); err != nil {
 		return nil, err
 	}
