@@ -119,7 +119,7 @@ func execute(url string, state *State, ops options) error {
 				}
 				dir := filepath.Dir(files[0])
 				Printf("Deleting temp files in %s\n", dir)
-				return os.RemoveAll(dir)
+				return RemoveAll(dir)
 			}
 		}
 	}

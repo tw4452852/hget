@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -23,6 +24,20 @@ func MkdirIfNotExist(folder string) error {
 		}
 	}
 	return nil
+}
+
+func RemoveAll(dir string) error {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("Remove all in %s?[y/n]:", dir)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	response = strings.ToLower(strings.TrimSpace(response))
+	if response[0] == 'n' {
+		return nil
+	}
+	return os.RemoveAll(dir)
 }
 
 func ExistDir(folder string) bool {
