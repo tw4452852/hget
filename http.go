@@ -107,11 +107,13 @@ func NewHttpDownloader(url string, par int) (*HttpDownloader, error) {
 }
 
 func getFileName(cd, url string) string {
-	if start := strings.Index(cd, "filename"); start > 0 {
-		start := strings.IndexByte(cd[start:], '"') + start
-		end := strings.IndexByte(cd[start+1:], '"') + start
-		if start != -1 && end != -1 {
-			return cd[start+1 : end]
+	if start := strings.Index(cd, "filename"); start != -1 {
+		if startQ := strings.IndexByte(cd[start:], '"'); startQ != -1 {
+			startQ += start
+			if endQ := strings.IndexByte(cd[startQ+1:], '"'); endQ != -1 {
+				endQ += startQ + 1
+				return cd[startQ+1 : endQ]
+			}
 		}
 	}
 	return path.Base(url)
