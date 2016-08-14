@@ -42,11 +42,10 @@ func RestoreHttpDownloader(s *State) (*HttpDownloader, error) {
 }
 
 func NewHttpDownloader(url string, par int) (*HttpDownloader, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Accept-Encoding", "gzip")
 
 	resp, err := client.Do(req)
 	if err != nil {
