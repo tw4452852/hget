@@ -12,8 +12,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cheggaaa/pb"
 	"github.com/fatih/color"
-	pb "gopkg.in/cheggaaa/pb.v1"
 )
 
 var (

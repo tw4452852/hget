@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-
 	"os"
 	"os/signal"
 	"path/filepath"

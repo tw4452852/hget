@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
 )
@@ -21,14 +20,12 @@ type Part struct {
 }
 
 func (s *State) Save() error {
-	d := filepath.Dir(s.Parts[0].Path)
 	//save state file
-	fmt.Printf("save state: %#v\n", s)
 	j, err := json.Marshal(s)
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filepath.Join(d, stateFileName), j, 0644)
+	return ioutil.WriteFile(filepath.Join(FolderOf(s.Name), stateFileName), j, 0644)
 }
 
 func Resume(task string) (*State, error) {
