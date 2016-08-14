@@ -2,22 +2,26 @@ package main
 
 import (
 	"flag"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 )
 
 type options struct {
-	conn   int
-	output string
+	conn    int
+	output  string
+	cookies string
 }
 
 func main() {
 	var ops options
 	flag.IntVar(&ops.conn, "n", runtime.NumCPU(), "concurrent connection")
 	flag.StringVar(&ops.output, "o", "", "output path")
+	flag.StringVar(&ops.cookies, "c", "", "cookies")
 
 	flag.Parse()
 
@@ -65,7 +69,7 @@ func execute(url string, state *State, ops options) error {
 	if state != nil {
 		downloader, err = RestoreHttpDownloader(state)
 	} else {
-		downloader, err = NewHttpDownloader(url, ops.conn)
+		downloader, err = NewHttpDownloader(url, ops.conn, getCookies(ops.cookies))
 	}
 	if err != nil {
 		return err
@@ -81,7 +85,7 @@ func execute(url string, state *State, ops options) error {
 				close(interruptChan)
 			}
 		case err := <-errorChan:
-			Errorf("%v", err)
+			Errorf("%v\n", err)
 			isInterrupted = true
 		case <-doneChan:
 			s := downloader.Capture()
@@ -121,8 +125,19 @@ func execute(url string, state *State, ops options) error {
 
 func usage() {
 	Printf(`Usage:
-hget [-n connection] -o path [URL]
+hget [-n connection] [-o path] [-c cookies] [URL]
 hget tasks
 hget resume -o path [TaskName]
 `)
+}
+
+func getCookies(s string) []*http.Cookie {
+	pairs := strings.Split(s, ";")
+	cookies := make([]*http.Cookie, 0, len(pairs))
+	for _, p := range pairs {
+		if nv := strings.Split(p, "="); len(nv) == 2 {
+			cookies = append(cookies, &http.Cookie{Name: nv[0], Value: nv[1]})
+		}
+	}
+	return cookies
 }

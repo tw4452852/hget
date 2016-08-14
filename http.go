@@ -28,23 +28,28 @@ type HttpDownloader struct {
 	name      string
 	size      int64
 	parts     []*Part
+	cookies   []*http.Cookie
 	resumable bool
 }
 
 func RestoreHttpDownloader(s *State) (*HttpDownloader, error) {
 	return &HttpDownloader{
 		url:       s.Url,
+		name:      s.Name,
 		size:      s.Parts[len(s.Parts)-1].RangeTo,
 		parts:     s.Parts,
-		name:      s.Name,
+		cookies:   s.Cookies,
 		resumable: true,
 	}, nil
 }
 
-func NewHttpDownloader(url string, par int) (*HttpDownloader, error) {
+func NewHttpDownloader(url string, par int, cookies []*http.Cookie) (*HttpDownloader, error) {
 	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
 		return nil, err
+	}
+	for _, c := range cookies {
+		req.AddCookie(c)
 	}
 
 	resp, err := client.Do(req)
@@ -101,6 +106,7 @@ func NewHttpDownloader(url string, par int) (*HttpDownloader, error) {
 		size:      size,
 		name:      fileName,
 		parts:     partCalculate(int64(par), size, fileName),
+		cookies:   cookies,
 		resumable: resumable,
 	}, nil
 }
@@ -140,9 +146,10 @@ func partCalculate(par, len int64, filename string) []*Part {
 
 func (d *HttpDownloader) Capture() *State {
 	return &State{
-		Url:   d.url,
-		Name:  d.name,
-		Parts: d.parts,
+		Url:     d.url,
+		Name:    d.name,
+		Parts:   d.parts,
+		Cookies: d.cookies,
 	}
 }
 
@@ -192,6 +199,9 @@ func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interr
 			if err != nil {
 				errorChan <- err
 				return
+			}
+			for _, c := range d.cookies {
+				req.AddCookie(c)
 			}
 
 			if len(d.parts) > 1 { // support range download just in case parallel factor is over 1

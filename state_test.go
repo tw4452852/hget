@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"os"
 	"reflect"
 	"testing"
@@ -30,6 +31,10 @@ func TestState(t *testing.T) {
 				RangeFrom: 0,
 				RangeTo:   345,
 			},
+		},
+		Cookies: []*http.Cookie{
+			{Name: "hello", Value: "world"},
+			{Name: "foo", Value: "bar"},
 		},
 	}
 

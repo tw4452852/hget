@@ -3,13 +3,15 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net/http"
 	"path/filepath"
 )
 
 type State struct {
-	Url   string
-	Name  string
-	Parts []*Part
+	Url     string
+	Name    string
+	Parts   []*Part
+	Cookies []*http.Cookie
 }
 
 type Part struct {
