@@ -130,6 +130,7 @@ func partCalculate(par, len int64, filename string) []*Part {
 
 		ret = append(ret, &Part{
 			Path:      filepath.Join(FolderOf(filename), fmt.Sprintf("%s.part%d", filename, j)),
+			Current:   from,
 			RangeFrom: from,
 			RangeTo:   to})
 	}
@@ -171,7 +172,7 @@ func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interr
 	var ws sync.WaitGroup
 	for i, part := range d.parts {
 		// do nothing if we are done
-		if part.RangeTo-part.RangeFrom <= part.Current {
+		if part.RangeTo <= part.Current {
 			bars[i].Set64(bars[1].Total)
 			bars[i].Finish()
 			continue
@@ -183,7 +184,7 @@ func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interr
 
 			bar := bars[loop]
 			part := d.parts[loop]
-			bar.Set64(part.Current)
+			bar.Set64(part.Current - part.RangeFrom)
 
 			//send request
 			req, err := http.NewRequest("GET", d.url, nil)
@@ -193,9 +194,9 @@ func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interr
 			}
 
 			if len(d.parts) > 1 { // support range download just in case parallel factor is over 1
-				ranges := fmt.Sprintf("bytes=%d-%d", part.RangeFrom, part.RangeTo)
+				ranges := fmt.Sprintf("bytes=%d-%d", part.Current, part.RangeTo)
 				if loop == (len(d.parts))-1 {
-					ranges = fmt.Sprintf("bytes=%d-", part.RangeFrom)
+					ranges = fmt.Sprintf("bytes=%d-", part.Current)
 				}
 				req.Header.Add("Range", ranges)
 				if err != nil {
@@ -215,7 +216,6 @@ func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interr
 
 			defer f.Close()
 			if err != nil {
-				Errorf("%v\n", err)
 				errorChan <- err
 				return
 			}
