@@ -58,7 +58,10 @@ func NewHttpDownloader(url string, par int, cookies []*http.Cookie) (*HttpDownlo
 	}
 	defer resp.Body.Close()
 
-	fmt.Printf("%#v\n", resp)
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("response error: %d", resp.StatusCode)
+	}
+	// fmt.Printf("%#v\n", resp)
 
 	const (
 		acceptRangeHeader        = "Accept-Ranges"
@@ -87,7 +90,6 @@ func NewHttpDownloader(url string, par int, cookies []*http.Cookie) (*HttpDownlo
 	}
 
 	fileName := getFileName(resp.Header.Get(contentDispositionHeader), url)
-	fmt.Printf("filename: %q\n", fileName)
 	folder := FolderOf(fileName)
 	if ExistDir(folder) {
 		state, err := Resume(fileName)
@@ -154,6 +156,7 @@ func (d *HttpDownloader) Capture() *State {
 }
 
 func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interruptChan chan struct{}) {
+	Printf("Target: %s\n", d.name)
 	size := d.size
 	switch {
 	case size <= 0:
@@ -222,8 +225,13 @@ func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interr
 				return
 			}
 			defer resp.Body.Close()
-			f, err := os.OpenFile(part.Path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 
+			if resp.StatusCode >= 400 {
+				errorChan <- fmt.Errorf("part %d: response error: %d", loop, resp.StatusCode)
+				return
+			}
+
+			f, err := os.OpenFile(part.Path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 			defer f.Close()
 			if err != nil {
 				errorChan <- err
