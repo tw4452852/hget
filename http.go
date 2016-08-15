@@ -172,6 +172,7 @@ func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interr
 	for i, part := range d.parts {
 		newbar := pb.New64(part.RangeTo - part.RangeFrom).SetUnits(pb.U_BYTES).Prefix(color.YellowString(fmt.Sprintf("part%d", i+1)))
 		newbar.ShowSpeed = true
+		newbar.Set64(part.Current - part.RangeFrom)
 		bars = append(bars, newbar)
 	}
 	barpool, err := pb.StartPool(bars...)
@@ -181,7 +182,6 @@ func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interr
 	for i, part := range d.parts {
 		// do nothing if we are done
 		if part.RangeTo <= part.Current {
-			bars[i].Set64(bars[1].Total)
 			bars[i].Finish()
 			continue
 		}
@@ -192,7 +192,6 @@ func (d *HttpDownloader) Do(doneChan chan struct{}, errorChan chan error, interr
 
 			bar := bars[loop]
 			part := d.parts[loop]
-			bar.Set64(part.Current - part.RangeFrom)
 
 			//send request
 			req, err := http.NewRequest("GET", d.url, nil)
