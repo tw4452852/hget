@@ -117,7 +117,7 @@ func getFileName(cd, url string) string {
 			startQ += start
 			if endQ := strings.IndexByte(cd[startQ+1:], '"'); endQ != -1 {
 				endQ += startQ + 1
-				return cd[startQ+1 : endQ]
+				return path.Base(cd[startQ+1 : endQ])
 			}
 		}
 	}
